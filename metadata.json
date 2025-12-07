@@ -1,0 +1,9 @@
+{
+  "name": "MediSage AI",
+  "description": "A dark-themed mobile health assistant for prescription analysis, pharmacy discovery, and safe health guidance.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
