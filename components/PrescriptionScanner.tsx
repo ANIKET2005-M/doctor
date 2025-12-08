@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { analyzePrescriptionImage, createReminderSchedule, getPharmacySearchTips } from '../services/geminiService';
 import { Medication, Profile, PharmacyTips } from '../types';
 import { Icons } from '../constants';
+import { useLanguage } from '../contexts/LanguageContext';
 
 
 interface Props {
@@ -76,6 +77,8 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
   const [pharmacyTips, setPharmacyTips] = useState<PharmacyTips | null>(null);
   const [isGeneratingTips, setIsGeneratingTips] = useState(false);
 
+  const { t, language } = useLanguage();
+
   // helper: names of medicines for tips
   const medicineNames = analyzedMeds.map((m) => m.name);
   
@@ -106,7 +109,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
     try {
         // Strip data:image/jpeg;base64, prefix
         const base64Data = imagePreview.split(',')[1];
-        const result = await analyzePrescriptionImage(base64Data);
+        const result = await analyzePrescriptionImage(base64Data, language);
         setAnalyzedMeds(result.medications);
         setSummary(result.summary);
         setShowScheduleCreator(true);
@@ -123,7 +126,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
       if (analyzedMeds.length === 0) return;
       setIsGeneratingSchedule(true);
       try {
-          const result = await createReminderSchedule(analyzedMeds, wakeTime, sleepTime);
+          const result = await createReminderSchedule(analyzedMeds, wakeTime, sleepTime, language);
           
           // Merge schedule back into analyzedMeds
           const updatedMeds = analyzedMeds.map(med => {
@@ -147,7 +150,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
     if (medicineNames.length === 0) return;
     setIsGeneratingTips(true);
     try {
-        const result = await getPharmacySearchTips(medicineNames, tipsLocation);
+        const result = await getPharmacySearchTips(medicineNames, tipsLocation, language);
         setPharmacyTips(result);
     } catch (e) {
         alert("Could not generate buying tips.");
@@ -182,9 +185,9 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
 
   return (
     <div className="flex flex-col h-full p-4 space-y-4 overflow-y-auto no-scrollbar pb-24 relative">
-      <h2 className="text-2xl font-bold text-white mb-2">Scan Prescription</h2>
+      <h2 className="text-2xl font-bold text-white mb-2">{t('scan_title')}</h2>
       {!hasResults && (
-        <p className="text-slate-400 text-sm">Upload a photo of a prescription to get an explanation and a daily reminder plan.</p>
+        <p className="text-slate-400 text-sm">{t('scan_desc')}</p>
       )}
 
       {/* Upload Area */}
@@ -200,7 +203,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
                     <div className="bg-primary-500/10 p-4 rounded-full mb-4">
                         <Icons.Scan />
                     </div>
-                    <span className="text-slate-300 font-medium">Tap to upload photo</span>
+                    <span className="text-slate-300 font-medium">{t('tap_upload')}</span>
                 </>
             )}
             <input 
@@ -225,7 +228,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
                 }}
                 className="flex-1 py-3 px-4 rounded-xl bg-slate-700 text-white font-medium hover:bg-slate-600"
               >
-                  Retake
+                  {t('retake')}
               </button>
               <button 
                 onClick={handleAnalyze}
@@ -235,11 +238,11 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
                   {isAnalyzing ? (
                       <>
                         <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-                        Analyzing...
+                        {t('analyzing')}
                       </>
                   ) : (
                       <>
-                        <Icons.Scan /> Analyze
+                        <Icons.Scan /> {t('analyze')}
                       </>
                   )}
               </button>
@@ -252,7 +255,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
               {summary && (
                   <div className="bg-gradient-to-br from-primary-900/40 to-slate-800 p-4 rounded-xl border border-primary-500/30">
                       <h3 className="text-primary-300 font-bold mb-1 flex items-center gap-2">
-                        <Icons.Info /> AI Summary
+                        <Icons.Info /> {t('ai_summary')}
                       </h3>
                       <p className="text-slate-200 text-sm leading-relaxed">{summary}</p>
                   </div>
@@ -301,11 +304,11 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
               {/* Schedule Generator */}
               {showScheduleCreator && (
                   <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 space-y-3">
-                      <h3 className="font-bold text-white">Customize Schedule</h3>
+                      <h3 className="font-bold text-white">{t('customize_schedule')}</h3>
                       <p className="text-xs text-slate-400">Enter your wake and sleep times to get precise reminder slots.</p>
                       <div className="flex gap-4">
                           <div className="flex-1 space-y-1">
-                              <label className="text-xs text-slate-400">Wake Up</label>
+                              <label className="text-xs text-slate-400">{t('wake_up')}</label>
                               <input 
                                 type="time" 
                                 value={wakeTime}
@@ -314,7 +317,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
                               />
                           </div>
                           <div className="flex-1 space-y-1">
-                              <label className="text-xs text-slate-400">Sleep</label>
+                              <label className="text-xs text-slate-400">{t('sleep')}</label>
                               <input 
                                 type="time" 
                                 value={sleepTime}
@@ -328,7 +331,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
                         disabled={isGeneratingSchedule}
                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold flex justify-center items-center gap-2"
                       >
-                         {isGeneratingSchedule ? 'Generating...' : 'Create Daily Plan'}
+                         {isGeneratingSchedule ? 'Generating...' : t('create_plan')}
                       </button>
                   </div>
               )}
@@ -401,7 +404,7 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
                 onClick={handleReset}
                 className="w-full py-4 mt-6 rounded-xl bg-dark-800 border border-slate-700 text-slate-300 font-bold hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center gap-2 shadow-lg"
               >
-                  <Icons.Scan /> Scan Another Prescription
+                  <Icons.Scan /> {t('scan_another')}
               </button>
           </div>
       )}
@@ -422,13 +425,13 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
                         onClick={() => setConfirmingMed(null)}
                         className="flex-1 py-3 px-4 rounded-xl bg-slate-700 text-white font-medium hover:bg-slate-600 transition-colors"
                     >
-                        Cancel
+                        {t('cancel')}
                     </button>
                     <button 
                         onClick={executeAddMed}
                         className="flex-1 py-3 px-4 rounded-xl bg-primary-600 text-white font-bold hover:bg-primary-500 transition-colors"
                     >
-                        Confirm
+                        {t('confirm')}
                     </button>
                 </div>
             </div>
@@ -439,4 +442,3 @@ const PrescriptionScanner: React.FC<Props> = ({ activeProfile, onAddMedication }
 };
 
 export default PrescriptionScanner;
-    

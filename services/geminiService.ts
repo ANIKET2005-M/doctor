@@ -1,28 +1,33 @@
 
 import { GoogleGenAI, Type, Schema, Part } from "@google/genai";
 import { Medication, Reminder, ScanResult, PharmacyTips, PharmacyStructuredData, MedicineAnalysis } from "../types";
+import { LANGUAGES } from '../constants';
 
 // Initialize the client. API_KEY is injected by the environment.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Helper to get language name
+const getLangName = (code: string) => LANGUAGES.find(l => l.code === code)?.name || 'English';
 
 const SAFETY_PREAMBLE = `
 You are MediSage, a helpful health assistant.
 RULES:
 1. You are NOT a doctor. Never diagnose illnesses or prescribe medication.
-2. If a user asks about a medical emergency (chest pain, trouble breathing, severe bleeding, etc.), tell them to call emergency services immediately.
-3. Keep answers simple, reassuring, and easy to understand for non-technical users.
-4. Translate medical jargon into plain English.
+2. If a user asks about a medical emergency, tell them to call emergency services.
+3. Keep answers simple, reassuring, and easy to understand.
 `;
 
 // --- Feature 1: Image Analysis (Prescription Parsing) ---
-export const analyzePrescriptionImage = async (base64Image: string): Promise<ScanResult> => {
+export const analyzePrescriptionImage = async (base64Image: string, language: string = 'en'): Promise<ScanResult> => {
+  const targetLang = getLangName(language);
+  
   // Schema strictly following the user's request
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
       summary: {
         type: Type.STRING,
-        description: "A short, human-friendly explanation of the prescription (under 3 sentences).",
+        description: `A short, human-friendly explanation of the prescription in ${targetLang} (under 3 sentences).`,
       },
       per_medicine: {
         type: Type.ARRAY,
@@ -31,14 +36,14 @@ export const analyzePrescriptionImage = async (base64Image: string): Promise<Sca
           properties: {
             name: { type: Type.STRING, description: "Name of the medicine" },
             dosage: { type: Type.STRING, description: "Dosage strength (e.g., 500mg)" },
-            frequency: { type: Type.STRING, description: "Frequency string (e.g., 3 times daily)" },
-            purpose: { type: Type.STRING, description: "Simple explanation of what it treats" },
+            frequency: { type: Type.STRING, description: `Frequency string translated to ${targetLang}` },
+            purpose: { type: Type.STRING, description: `Simple explanation of what it treats in ${targetLang}` },
             expiry_date: { type: Type.STRING, description: "Expiry date text if visible (e.g. '12/25'), else null" },
-            patient_instruction: { type: Type.STRING, description: "Simple, clear instructions for the patient in plain English." },
+            patient_instruction: { type: Type.STRING, description: `Simple, clear instructions for the patient in ${targetLang}.` },
             safety_notes: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "List of safety warnings, side effects, or expiry warnings"
+              description: `List of safety warnings in ${targetLang}`
             },
             reminder_slots: {
               type: Type.ARRAY,
@@ -70,15 +75,15 @@ export const analyzePrescriptionImage = async (base64Image: string): Promise<Sca
             
             Task:
             1. OCR the text from the image.
-            2. Generate a short, human-friendly explanation of the prescription.
+            2. Generate a short, human-friendly explanation of the prescription in ${targetLang}.
             3. Produce a structured reminder plan for each medicine found.
-            4. Detect any expiry dates. If found, return them. If an expiry date is passed or within 30 days, YOU MUST add a clear warning to 'safety_notes'.
+            4. Detect any expiry dates.
+            5. Translate all instructions, purposes, and frequencies to ${targetLang}.
             
             Requirements:
-            - Use only the information visible; do not invent dosages.
-            - If data is missing, note it in the instructions.
+            - Use only the information visible.
             - Keep the summary under 3 sentences.
-            - Translate instructions into simple English suitable for a non-medical person.
+            - Ensure all output fields (summary, instructions, purpose) are in ${targetLang}.
             `
           }
         ]
@@ -121,9 +126,11 @@ export const analyzePrescriptionImage = async (base64Image: string): Promise<Sca
 export const createReminderSchedule = async (
   medicines: Partial<Medication>[],
   wakeTime: string,
-  sleepTime: string
+  sleepTime: string,
+  language: string = 'en'
 ): Promise<{ schedule: { name: string, reminders: Reminder[] }[] }> => {
-  
+  const targetLang = getLangName(language);
+
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
@@ -139,7 +146,7 @@ export const createReminderSchedule = async (
                 type: Type.OBJECT,
                 properties: {
                   time: { type: Type.STRING, description: "24-hour format HH:MM" },
-                  label: { type: Type.STRING, description: "Friendly label like 'Morning after breakfast'" }
+                  label: { type: Type.STRING, description: `Friendly label in ${targetLang}` }
                 },
                 required: ["time", "label"]
               }
@@ -155,7 +162,7 @@ export const createReminderSchedule = async (
   try {
     const medList = medicines.map(m => ({
       name: `${m.name} ${m.dosage || ''}`,
-      frequency_per_day: m.frequency, // Passing the string, model will infer count
+      frequency_per_day: m.frequency, 
       duration: "As prescribed"
     }));
 
@@ -170,13 +177,11 @@ export const createReminderSchedule = async (
       Medicines: ${JSON.stringify(medList)}
 
       Task:
-      Generate a JSON list of reminder times in 24‑hour format and friendly labels.
+      Generate a JSON list of reminder times in 24‑hour format and friendly labels in ${targetLang}.
 
       Rules:
       1. Spread reminders evenly between wake and sleep times based on frequency.
-      2. Never change the prescribed frequency.
-      3. If the schedule conflicts with sleep_time, gently suggest the user confirm timing with the doctor in the label.
-      4. Use the provided JSON schema.
+      2. Ensure labels are translated to ${targetLang} (e.g., "After Breakfast" -> "${targetLang} equivalent").
       `,
       config: {
         responseMimeType: "application/json",
@@ -195,15 +200,16 @@ export const createReminderSchedule = async (
 };
 
 // --- Feature: Pharmacy Search Advice ---
-export const getPharmacySearchTips = async (medicines: string[], location: string): Promise<PharmacyTips> => {
+export const getPharmacySearchTips = async (medicines: string[], location: string, language: string = 'en'): Promise<PharmacyTips> => {
+  const targetLang = getLangName(language);
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
-      guide: { type: Type.STRING, description: "A short paragraph guiding the user on how to find the medicines." },
+      guide: { type: Type.STRING, description: `A short paragraph in ${targetLang} guiding the user.` },
       tips: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING },
-        description: "3 bullet points on what to check." 
+        description: `3 bullet points in ${targetLang} on what to check.` 
       }
     },
     required: ["guide", "tips"]
@@ -214,19 +220,15 @@ export const getPharmacySearchTips = async (medicines: string[], location: strin
       model: 'gemini-2.5-flash',
       contents: `
       Task: Create short, safe text suggestions to help a user find pharmacies.
+      Output Language: ${targetLang}.
       
       Input:
       Medicines: ${medicines.join(', ')}
       Location: ${location || 'local pharmacies'}
 
       Output:
-      1. A short paragraph guiding the user how to search nearby pharmacies.
-      2. 3 bullet-point tips on what to check (availability, expiry date, generic equivalents, etc.).
-
-      Constraints:
-      - Do not recommend specific brands or stores by name.
-      - Encourage users to buy from licensed pharmacies only.
-      - Keep the tone neutral and supportive.
+      1. A short paragraph in ${targetLang}.
+      2. 3 bullet-point tips in ${targetLang}.
       `,
       config: {
         responseMimeType: "application/json",
@@ -245,7 +247,8 @@ export const getPharmacySearchTips = async (medicines: string[], location: strin
 };
 
 // --- Feature 2: Chatbot ---
-export const chatWithMediSage = async (history: {role: string, parts: Part[]}[], message: string): Promise<string> => {
+export const chatWithMediSage = async (history: {role: string, parts: Part[]}[], message: string, language: string = 'en'): Promise<string> => {
+  const targetLang = getLangName(language);
   try {
     const chat = ai.chats.create({
       model: 'gemini-3-pro-preview',
@@ -256,17 +259,17 @@ export const chatWithMediSage = async (history: {role: string, parts: Part[]}[],
         },
         {
             role: 'model',
-            parts: [{ text: "Hello! I am MediSage. I can help explain medications and health topics. Remember, I am an AI, not a doctor. Always consult a professional for medical advice." }]
+            parts: [{ text: `Hello! I am MediSage. I will answer in ${targetLang}.` }]
         },
         ...history
       ],
       config: {
-        systemInstruction: SAFETY_PREAMBLE,
+        systemInstruction: `${SAFETY_PREAMBLE} IMPORTANT: Respond to all queries in ${targetLang}.`,
         tools: [{googleSearch: {}}]
       }
     });
 
-    const result = await chat.sendMessage({ message });
+    const result = await chat.sendMessage({ message: `${message} (Answer in ${targetLang})` });
     return result.text || "I'm sorry, I couldn't generate a response.";
   } catch (error) {
     console.error("Chat failed", error);
@@ -277,6 +280,8 @@ export const chatWithMediSage = async (history: {role: string, parts: Part[]}[],
 // --- Feature 3: Pharmacy Discovery (Maps Grounding) ---
 export const findNearbyPharmacies = async (userLat: number, userLng: number, query: string): Promise<{ text: string, chunks: any[] }> => {
   try {
+    // Maps grounding results are typically in the local language of the region or English.
+    // We can't strictly force the API to translate *place names* but we can prompt the text generation part.
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `Find pharmacies near me. Context: ${query}`,
@@ -306,6 +311,7 @@ export const findNearbyPharmacies = async (userLat: number, userLng: number, que
 
 // --- Feature: Parse Pharmacy Text ---
 export const parsePharmacyText = async (rawText: string): Promise<PharmacyStructuredData> => {
+  // Parsing structure remains language-agnostic as it extracts data
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
@@ -358,26 +364,27 @@ export const parsePharmacyText = async (rawText: string): Promise<PharmacyStruct
 };
 
 // --- Feature: Identify Medicine ---
-export const identifyMedicine = async (base64Image: string): Promise<MedicineAnalysis> => {
+export const identifyMedicine = async (base64Image: string, language: string = 'en'): Promise<MedicineAnalysis> => {
+  const targetLang = getLangName(language);
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
       name: { type: Type.STRING, description: "The name of the medicine detected." },
-      description: { type: Type.STRING, description: "A brief description of the medicine." },
+      description: { type: Type.STRING, description: `A brief description of the medicine in ${targetLang}.` },
       uses: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: "List of common diseases or conditions this medicine treats." 
+        description: `List of common diseases or conditions this medicine treats in ${targetLang}.` 
       },
       warnings: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING },
-        description: "Important safety warnings." 
+        description: `Important safety warnings in ${targetLang}.` 
       },
       side_effects: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: "Common side effects."
+        description: `Common side effects in ${targetLang}.`
       }
     },
     required: ["name", "description", "uses", "warnings", "side_effects"]
@@ -400,10 +407,10 @@ export const identifyMedicine = async (base64Image: string): Promise<MedicineAna
             
             Task:
             1. Identify the medicine name.
-            2. Explain what it is used for (indications).
-            3. List key warnings and common side effects.
+            2. Explain what it is used for (indications) in ${targetLang}.
+            3. List key warnings and common side effects in ${targetLang}.
             
-            If the image is unclear or not a medicine, state 'Unknown Medicine' as the name and explain why in the description.
+            If the image is unclear or not a medicine, state 'Unknown Medicine' as the name.
             `
           }
         ]

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Profile, Medication } from '../types';
 import { Icons } from '../constants';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface Props {
   profiles: Profile[];
@@ -16,6 +17,7 @@ const FamilyManager: React.FC<Props> = ({ profiles, activeProfileId, onSwitchPro
   const [newName, setNewName] = useState('');
   const [newRelationship, setNewRelationship] = useState<Profile['relationship']>('Other');
   const [newAge, setNewAge] = useState('');
+  const { t } = useLanguage();
 
   const handleCreateProfile = () => {
     if (!newName.trim()) return;
@@ -42,7 +44,7 @@ const FamilyManager: React.FC<Props> = ({ profiles, activeProfileId, onSwitchPro
     <div className="flex flex-col h-full p-4 space-y-6 overflow-y-auto no-scrollbar pb-24 relative">
       {/* Profile Selector */}
       <div>
-        <h2 className="text-xl font-bold text-white mb-4">Family Profiles</h2>
+        <h2 className="text-xl font-bold text-white mb-4">{t('family_profiles')}</h2>
         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
             {profiles.map(profile => (
                 <div 
@@ -63,7 +65,7 @@ const FamilyManager: React.FC<Props> = ({ profiles, activeProfileId, onSwitchPro
                  <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-400 bg-slate-800/50">
                     <Icons.Add />
                  </div>
-                 <span className="text-sm text-slate-400">Add</span>
+                 <span className="text-sm text-slate-400">{t('add_profile')}</span>
             </div>
         </div>
       </div>
@@ -145,11 +147,11 @@ const FamilyManager: React.FC<Props> = ({ profiles, activeProfileId, onSwitchPro
                 <div className="absolute top-4 right-4 text-slate-500 cursor-pointer" onClick={() => setIsModalOpen(false)}>
                     <Icons.Close />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-4">New Profile</h3>
+                <h3 className="text-xl font-bold text-white mb-4">{t('new_profile')}</h3>
                 
                 <div className="space-y-4">
                     <div>
-                        <label className="text-xs text-slate-400 block mb-1">Name</label>
+                        <label className="text-xs text-slate-400 block mb-1">{t('name')}</label>
                         <input 
                             type="text" 
                             value={newName}
@@ -161,7 +163,7 @@ const FamilyManager: React.FC<Props> = ({ profiles, activeProfileId, onSwitchPro
                     
                     <div className="flex gap-4">
                         <div className="flex-1">
-                            <label className="text-xs text-slate-400 block mb-1">Relationship</label>
+                            <label className="text-xs text-slate-400 block mb-1">{t('relationship')}</label>
                             <select 
                                 value={newRelationship}
                                 onChange={(e) => setNewRelationship(e.target.value as any)}
@@ -175,7 +177,7 @@ const FamilyManager: React.FC<Props> = ({ profiles, activeProfileId, onSwitchPro
                             </select>
                         </div>
                         <div className="w-24">
-                            <label className="text-xs text-slate-400 block mb-1">Age (opt)</label>
+                            <label className="text-xs text-slate-400 block mb-1">{t('age')} (opt)</label>
                             <input 
                                 type="number" 
                                 value={newAge}
@@ -192,14 +194,14 @@ const FamilyManager: React.FC<Props> = ({ profiles, activeProfileId, onSwitchPro
                         onClick={() => setIsModalOpen(false)}
                         className="flex-1 py-3 px-4 rounded-xl bg-slate-700 text-white font-medium hover:bg-slate-600 transition-colors"
                     >
-                        Cancel
+                        {t('cancel')}
                     </button>
                     <button 
                         onClick={handleCreateProfile}
                         disabled={!newName.trim()}
                         className="flex-1 py-3 px-4 rounded-xl bg-primary-600 text-white font-bold hover:bg-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Create
+                        {t('create')}
                     </button>
                 </div>
             </div>
